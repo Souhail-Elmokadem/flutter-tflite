@@ -1,9 +1,9 @@
-import 'dart:io';
-import 'package:flutter/cupertino.dart';
+import 'dart:typed_data'; // For Uint8List
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
-import 'package:image/image.dart' as img;
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as img;  // Import the image package
 
 class AiScreen extends StatefulWidget {
   AiScreen({super.key});
@@ -13,121 +13,132 @@ class AiScreen extends StatefulWidget {
 }
 
 class _AiScreenState extends State<AiScreen> {
-  File? _imageFile;
-  final ImagePicker _picker = ImagePicker();
-  Interpreter? interpreter;
-  List<double> output = [];
-  List<String> labels = ['apple', 'banana', 'orange'];  // Example labels (replace with your own labels)
+  Interpreter? _interpreter;
+  List<String> _labels = ['Apple', 'Banana', 'Grape', 'Mango', 'Strawberry'];
+  String _result = "Choose an image ";
+  File? _image;
+
+
+
+  @override
+  void initState() {
+    super.initState();
+    _loadModel();
+  }
 
   // Load the TensorFlow Lite model
-  Future<void> loadModel() async {
+  Future<void> _loadModel() async {
     try {
-      interpreter = await Interpreter.fromAsset('assets/model_ML/fruits_model.tflite');
-      print("Model loaded successfully!");
+      _interpreter = await Interpreter.fromAsset('assets/model.tflite');
+      print("Model loaded successfully");
     } catch (e) {
       print("Error loading model: $e");
     }
   }
 
-  // Preprocess the image (resize and normalize it)
-  List<List<List<List<double>>>> preprocessImage(File image) {
-    final rawImage = img.decodeImage(image.readAsBytesSync())!;
-    final resizedImage = img.copyResize(rawImage, width: 224, height: 224); // Resize to 224x224
-    final inputImage = List.generate(1, (i) => List.generate(224, (j) => List.generate(224, (k) => List.filled(3, 0.0))));
-
-    for (int i = 0; i < 224; i++) {
-      for (int j = 0; j < 224; j++) {
-        final pixel = resizedImage.getPixel(i, j);
-        final red = (img.getRed(pixel) / 255.0);   // Normalize Red channel
-        final green = (img.getGreen(pixel) / 255.0); // Normalize Green channel
-        final blue = (img.getBlue(pixel) / 255.0);   // Normalize Blue channel
-
-        inputImage[0][i][j][0] = red;   // Red channel
-        inputImage[0][i][j][1] = green; // Green channel
-        inputImage[0][i][j][2] = blue;  // Blue channel
-      }
-    }
-    return inputImage;
-  }
-
-  // Pick an image from gallery
+  // Function to classify an image
   Future<void> _pickImage() async {
-    final XFile? pickedFile = await _picker.pickImage(
-      source: ImageSource.gallery,
-      maxHeight: 800,
-      maxWidth: 800,
-    );
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
     if (pickedFile != null) {
       setState(() {
-        _imageFile = File(pickedFile.path);
+        _image = File(pickedFile.path);
+        _result = "Classifying...";  // Update UI to show that classification is in progress
       });
-      await predictImage(File(pickedFile.path));  // Predict once the image is picked
+
+      // Call the classify function after updating the UI
+      await _classifyImage(_image!);
     }
   }
 
-  // Predict using the model
-  Future<void> predictImage(File image) async {
+  Future<void> _classifyImage(File image) async {
     try {
-      final input = preprocessImage(image);  // Preprocess the image
-      output = List.filled(labels.length, 0.0);
+      // Preprocess the image (resize and normalize)
+      var input = await _preprocessImage(image);
+
+      // Initialize the output tensor to be a list of doubles
+      var output = List.generate(1, (i) => List.generate(_labels.length, (j) => 0.0));
 
       // Run inference
-      if(interpreter != null){
-        interpreter!.run(input, output);
-      }
+      _interpreter?.run(input, output);
+
+      // Print the raw output probabilities
+      print("Output: $output");
+
       // Get the index of the highest probability
-      int predictedLabelIndex = output.indexOf(output.reduce((a, b) => a > b ? a : b));
-      String predictedLabel = labels[predictedLabelIndex];
+      var maxIndex = output[0].indexOf(output[0].reduce((a, b) => a > b ? a : b));
 
-      print("Prediction: $predictedLabel with confidence: ${output[predictedLabelIndex]}");
-
+      // Set the result as the class label corresponding to the highest probability
       setState(() {
-        // Update UI with prediction results
+        _result = _labels[maxIndex];  // Use the index to get the label from _labels
       });
-      print(output);
-
     } catch (e) {
-      print("Error during prediction: $e");
+      setState(() {
+        _result = "Error classifying image";  // Update result in case of error
+      });
+      print("Error classifying image: $e");
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    loadModel();  // Load model when the screen is initialized
+
+
+
+
+  // Preprocess the image to fit the model input
+  Future<List<List<List<List<double>>>>> _preprocessImage(File image) async {
+    var imageBytes = await image.readAsBytes();
+
+    // Decode the image to an img.Image object using the image package
+    img.Image? imageData = img.decodeImage(Uint8List.fromList(imageBytes));
+
+    // Resize the image to 150x150 using the image package's copyResize method
+    img.Image resizedImage = img.copyResize(imageData!, width: 150, height: 150);
+
+    // Normalize the image data (scale pixel values between 0 and 1)
+    List<List<List<double>>> processedData = List.generate(150, (i) {
+      return List.generate(150, (j) {
+        var pixel = resizedImage.getPixel(j, i);
+        // Normalize each RGB component to a double between 0 and 1
+        return [
+          img.getRed(pixel) / 255.0,
+          img.getGreen(pixel) / 255.0,
+          img.getBlue(pixel) / 255.0
+        ];
+      });
+    });
+
+    // Reshape to [1, 150, 150, 3] for TensorFlow Lite input
+    var inputTensor = processedData.map((row) {
+      return row.map((pixel) {
+        return List<double>.from(pixel);  // Convert the pixel values to List<double>
+      }).toList();
+    }).toList();
+
+    return [inputTensor];  // Wrap in outer list to match model's expected shape
   }
+
+  // Select an image from the gallery
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("AI Fruit Prediction")),
+      appBar: AppBar(title: Text("Fruit Classifier")),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _imageFile != null
-                ? Image.file(_imageFile!)
-                : Text("No image selected"),
-            ElevatedButton.icon(
+          children: <Widget>[
+            _image == null
+                ? Text("No image selected")
+                : Image.file(_image!),
+            SizedBox(height: 20),
+            Text(_result, style: TextStyle(fontSize: 24)),
+            SizedBox(height: 20),
+            ElevatedButton(
               onPressed: _pickImage,
-              icon: Icon(Icons.upload),
-              label: Text('Upload Image'),
-              style: ElevatedButton.styleFrom(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              ),
+              child: Text("Pick an image to classify"),
             ),
-            if (_imageFile != null)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  children: [
-                    Text(
-                      "Prediction: ${output.isNotEmpty ? labels[output.indexOf(output.reduce((a, b) => a > b ? a : b))] : 'No prediction yet'}",
-                      style: TextStyle(fontSize: 18),
-                    ),
-                  ],
-                ),
-              ),
           ],
         ),
       ),

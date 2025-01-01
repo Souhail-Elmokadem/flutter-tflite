@@ -30,7 +30,7 @@ class MyApp extends StatelessWidget {
       create: (_) => AuthCubit(),
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: HomePage(),
+        home: LoginScreen(),
         routes: {
           '/home': (context) => HomePage(),
           '/login':(context) => LoginScreen(),
