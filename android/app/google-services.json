@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "838698177412",
+    "project_id": "g-tasks-8000c",
+    "storage_bucket": "g-tasks-8000c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:838698177412:android:c5b037fb2e04d6d69803d1",
+        "android_client_info": {
+          "package_name": "com.example.flutterapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfnsbaZf5ETa5YnAKrGAy1Ma1YoHu-eO8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:838698177412:android:727ca5d297d798ec9803d1",
+        "android_client_info": {
+          "package_name": "com.example.testtp1android"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfnsbaZf5ETa5YnAKrGAy1Ma1YoHu-eO8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
